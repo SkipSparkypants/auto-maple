@@ -54,3 +54,4 @@ model = detection.load_model()
 frame_queue = queue.Queue()
 detection_inferences = {}
 detection_result = None
+solve_rune_attempt = 0
