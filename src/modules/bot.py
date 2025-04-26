@@ -147,11 +147,11 @@ class Bot(Configurable):
                 press(arrow, 1, down_time=0.15)
             self.rune_active = False
         if config.solve_rune_attempt > 3:
-            config.auto_pot_enabled = False
+            config.auto_pot_enabled = True
             self.change_channel()
             config.solve_rune_attempt = 0
 
-        config.auto_pot_enabled = False
+        config.auto_pot_enabled = True
         config.detection_result = None
         #print(config.detection_inferences)
         config.detection_inferences.clear()
