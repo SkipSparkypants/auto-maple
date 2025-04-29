@@ -27,8 +27,8 @@ class Bot(Configurable):
     """A class that interprets and executes user-defined routines."""
 
     DEFAULT_CONFIG = {
-        'Interact': 'y',
-        'Feed Pet': '9',
+        'Interact': 'space',
+        'Feed Pet': '6',
         'Change Channel': ','
     }
 
@@ -146,6 +146,7 @@ class Bot(Configurable):
             for arrow in config.detection_result:
                 press(arrow, 1, down_time=0.15)
             self.rune_active = False
+            config.solve_rune_attempt = 0
         if config.solve_rune_attempt > 3:
             config.auto_pot_enabled = True
             self.change_channel()
