@@ -137,7 +137,7 @@ class Bot(Configurable):
         for _ in range(self.NUM_FRAMES_TO_PROCESS):
             try:
                 config.frame_queue.put_nowait(config.capture.frame)
-            except config.frame_queue.full:
+            except queue.Full:
                 #clear the queue
                 config.frame_queue.queue.clear()
             time.sleep(self.TIME_BETWEEN_FRAMES)
