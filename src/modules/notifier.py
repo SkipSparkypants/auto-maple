@@ -30,11 +30,7 @@ OTHER_TEMPLATE = cv2.cvtColor(other_filtered, cv2.COLOR_BGR2GRAY)
 ELITE_TEMPLATE = cv2.imread('assets/elite_template.jpg', 0)
 END_CHAT_TEMPLATE = cv2.imread('assets/end_chat.png', 0)
 OK_TEMPLATE = cv2.imread('assets/ok.png', 0)
-
-
-def get_alert_path(name):
-    return os.path.join(Notifier.ALERTS_DIR, f'{name}.mp3')
-
+CC_ASSETS_PATH = os.path.join('assets', 'cc_on_sight')
 
 class Notifier:
     ALERTS_DIR = os.path.join('assets', 'alerts')
@@ -52,6 +48,7 @@ class Notifier:
         self.room_change_threshold = 0.9
         self.rune_alert_delay = 270         # 4.5 minutes
         self.CC_THRESHOLD = 30
+        self.cc_assets = get_assets(CC_ASSETS_PATH)
 
     def start(self):
         """Starts this Notifier's thread."""
@@ -78,7 +75,6 @@ class Notifier:
                     time.sleep(0.1)
                     #self._alert('siren'
 
-
                 # Check for elite warning
                 # elite_frame = frame[height // 4:3 * height // 4, width // 4:3 * width // 4]
                 # elite = utils.multi_match(elite_frame, ELITE_TEMPLATE, threshold=0.9)
@@ -87,25 +83,17 @@ class Notifier:
                 #     #self._alert('siren')
 
                 # Check for end chat
-                if end_chat_count > 5:
-                    end_chat = utils.multi_match(frame, END_CHAT_TEMPLATE)
-                    if end_chat:
-                        end_chat_pos = min(end_chat, key=lambda p: p[0])
-                        target = (
-                            round(end_chat_pos[0] + config.capture.window['left']),
-                            round(end_chat_pos[1] + config.capture.window['top'])
-                        )
-                        click(target, button='left')
+                if end_chat_count > 60:
+                    click_target(frame, END_CHAT_TEMPLATE)
+                    click_target(frame, OK_TEMPLATE)
 
-                    ok = utils.multi_match(frame, OK_TEMPLATE)
-                    if ok:
-                        ok_pos = min(ok, key=lambda p: p[0])
-                        target = (
-                            round(ok_pos[0] + config.capture.window['left']),
-                            round(ok_pos[1] + config.capture.window['top'])
-                        )
-                        click(target, button='left')
+                    for asset in self.cc_assets:
+                        asset_match = utils.multi_match(frame, asset)
+                        if asset_match:
+                            self._ping('ding')
+                            config.bot.cc_flag = True
 
+                    end_chat_count = 0
 
                 # Check for other players entering the map
                 filtered = utils.filter_color(minimap, OTHER_RANGES)
@@ -170,6 +158,25 @@ class Notifier:
 #################################
 #       Helper Functions        #
 #################################
+def get_assets(path):
+    assets = []
+    for item in os.listdir(path):
+        item_path = os.path.join(path, item)
+        if os.path.isfile(item_path):
+            assets.append(cv2.imread(item_path, 0))
+
+    return assets
+
+def click_target(frame, template):
+    template_found = utils.multi_match(frame, template)
+    if template_found:
+        template_pos = min(template_found, key=lambda p: p[0])
+        target = (
+            round(template_pos[0] + config.capture.window['left']),
+            round(template_pos[1] + config.capture.window['top'])
+        )
+        click(target, button='left')
+
 def distance_to_rune(point):
     """
     Calculates the distance from POINT to the rune.
@@ -180,3 +187,6 @@ def distance_to_rune(point):
     if isinstance(point, Point):
         return utils.distance(config.bot.rune_pos, point.location)
     return float('inf')
+
+def get_alert_path(name):
+    return os.path.join(Notifier.ALERTS_DIR, f'{name}.mp3')
