@@ -15,6 +15,7 @@ from src.command_book.command_book import CommandBook
 from src.routine.components import Point
 from src.common.vkeys import press, click
 from src.common.interfaces import Configurable
+import queue
 
 from random import randint
 
@@ -134,7 +135,11 @@ class Bot(Configurable):
         time.sleep(1.5)
 
         for _ in range(self.NUM_FRAMES_TO_PROCESS):
-            config.frame_queue.put(config.capture.frame)
+            try:
+                config.frame_queue.put_nowait(config.capture.frame)
+            except config.frame_queue.full:
+                #clear the queue
+                config.frame_queue.queue.clear()
             time.sleep(self.TIME_BETWEEN_FRAMES)
 
         now = time.time()

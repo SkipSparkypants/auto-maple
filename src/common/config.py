@@ -49,9 +49,10 @@ auto_pot = None
 # Shares the gui to all modules
 gui = None
 
+queue_max_size = 50
 # Detection Infra
 model = detection.load_model()
-frame_queue = queue.Queue()
+frame_queue = queue.Queue(maxsize=queue_max_size)
 detection_inferences = {}
 detection_result = None
 solve_rune_attempt = 0
