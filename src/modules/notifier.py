@@ -1,5 +1,7 @@
 """A module for detecting and notifying the user of dangerous in-game events."""
 
+from discord_webhook import DiscordWebhook
+import pyautogui
 from src.common import config, utils
 import time
 import os
@@ -31,6 +33,26 @@ ELITE_TEMPLATE = cv2.imread('assets/elite_template.jpg', 0)
 END_CHAT_TEMPLATE = cv2.imread('assets/end_chat.png', 0)
 OK_TEMPLATE = cv2.imread('assets/ok.png', 0)
 CC_ASSETS_PATH = os.path.join('assets', 'cc_on_sight')
+WEBHOOK_URL = 'placeurl'
+USER_NAME = os.getlogin()
+SCREEN_SHOT_LOCATION = r'C:\Users\\' + USER_NAME + "\Desktop\screenshot.png"
+
+def get_alert_path(name):
+    return os.path.join(Notifier.ALERTS_DIR, f'{name}.mp3')
+
+def send_to_webhook(discription):
+    #print("sending screenshot")
+    # now = time.time()
+    # if config.webhook_cd == 0 or now - config.webhook_cd < 300:
+    #     return
+    webhook = DiscordWebhook(url=WEBHOOK_URL, username=discription)
+    screenshot = pyautogui.screenshot()
+    screenshot.save(SCREEN_SHOT_LOCATION)
+    with open(SCREEN_SHOT_LOCATION,"rb") as f:
+        webhook.add_file(file=f.read(),filename="screenshot.png")
+    webhook.execute()
+    #config.webhook_cd = now
+    
 
 class Notifier:
     ALERTS_DIR = os.path.join('assets', 'alerts')
@@ -83,7 +105,7 @@ class Notifier:
                 #     #self._alert('siren')
 
                 # Check for end chat
-                if end_chat_count > 60:
+                if end_chat_count > 10:
                     click_target(frame, END_CHAT_TEMPLATE)
                     click_target(frame, OK_TEMPLATE)
 

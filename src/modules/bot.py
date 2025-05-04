@@ -8,6 +8,7 @@ import inspect
 import importlib
 import traceback
 from os.path import splitext, basename
+from src.modules.notifier import send_to_webhook
 from src.common import config, utils
 from src.routine import components
 from src.routine.routine import Routine
@@ -28,8 +29,8 @@ class Bot(Configurable):
     """A class that interprets and executes user-defined routines."""
 
     DEFAULT_CONFIG = {
-        'Interact': 'y',
-        'Feed Pet': '9',
+        'Interact': 'space',
+        'Feed Pet': '6',
         'Change Channel': ','
     }
 
@@ -152,6 +153,7 @@ class Bot(Configurable):
                 press(arrow, 1, down_time=0.15)
             self.rune_active = False
             config.solve_rune_attempt = 0
+            send_to_webhook('solved rune')
         if config.solve_rune_attempt > 3:
             config.auto_pot_enabled = True
             self.change_channel()
@@ -169,7 +171,7 @@ class Bot(Configurable):
         Changes to a random channel
         :return:        None
         """
-        #print('\nChanging Channel')
+        print('\nChanging Channel')
         self.command_book.deff.main()
         time.sleep(5.00)
         num_steps = randint(1, 10)
@@ -187,6 +189,7 @@ class Bot(Configurable):
         press('enter', 1)
 
         self.rune_active = False
+        send_to_webhook('change channel')
 
 
     def load_commands(self, file):
