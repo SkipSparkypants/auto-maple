@@ -41,7 +41,7 @@ class Bot(Configurable):
 
         self.NUM_DETECTION_WORKERS = 2
         self.NUM_FRAMES_TO_PROCESS = self.NUM_DETECTION_WORKERS * 10
-        self.TIME_BETWEEN_FRAMES = 0.15
+        self.TIME_BETWEEN_FRAMES = 0.2
         self.TIME_TO_SOLVE = 10
 
         self.cc_flag = False
@@ -132,7 +132,7 @@ class Bot(Configurable):
         print('\nSolving rune:')
         config.detection_result = None
         press(self.config['Interact'], 1, down_time=0.2)  # Inherited from Configurable
-        time.sleep(1.5)
+        time.sleep(1.0)
 
         for _ in range(self.NUM_FRAMES_TO_PROCESS):
             try:

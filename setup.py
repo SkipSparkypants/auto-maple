@@ -48,8 +48,9 @@ def create_desktop_shortcut():
     #   conda env config vars set LD_LIBRARY_PATH="C:\ProgramData\miniconda3;C:\ProgramData\miniconda3\Library\mingw-w64\bin;C:\ProgramData\miniconda3\Library\usr\bin;C:\ProgramData\miniconda3\Library\bin;C:\ProgramData\miniconda3\Scripts"
     gpu_cmd = ""
     if args.gpu:
-        home_dir = os.path.expanduser( '~' )
-        gpu_cmd = f"{home_dir}\\miniconda3\\Scripts\\activate.bat {home_dir}\\miniconda3 & conda activate tf & "
+        # home_dir = os.path.expanduser( '~' )
+        home_dir = f"C:\ProgramData"
+        gpu_cmd = f"{home_dir}\\anaconda3\\Scripts\\activate.bat {home_dir}\\anaconda3 & conda activate tf & "
 
     shell = client.Dispatch('WScript.Shell')
     shortcut_path = os.path.join(shell.SpecialFolders('Desktop'), 'Auto Maple.lnk')
