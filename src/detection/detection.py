@@ -9,7 +9,10 @@ from src.common import utils
 import os
 
 POINT_THRESHOLD_NUM_PIXELS = 5
-INTERSECTION_THRESHOLD_NUM_PIXELS = 10
+INTERSECTION_THRESHOLD_NUM_PIXELS = 15
+ARROW_MIN_ANGLE = 70
+ARROW_MAX_ANGLE = 110
+
 DEBUG = False
 TF = False
 
@@ -49,8 +52,8 @@ def filter_color(image):
     """
 
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    mask_1 = cv2.inRange(hsv, (1, 75, 175), (85, 255, 255))
-    mask_2 = cv2.inRange(hsv, (95, 75, 175), (180, 255, 255))
+    mask_1 = cv2.inRange(hsv, (1, 75, 100), (85, 255, 255))
+    mask_2 = cv2.inRange(hsv, (95, 75, 100), (180, 255, 255))
     mask = cv2.bitwise_or(mask_1, mask_2)
 
     # Mask the image
@@ -193,7 +196,7 @@ def merge_detection(model, image):
             cv2.imwrite(f"assets/training/{uuid_1}-rotated.png", rotated)
     return classes
 
-#@utils.run_if_enabled
+# @utils.run_if_enabled
 def find_arrows(image):
     processed_image = preprocess(image)
     contours, _ = cv2.findContours(processed_image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -210,7 +213,6 @@ def find_arrows(image):
         cv2.imshow("arrows", processed_image)
 
     arrows = []
-
     # Get polygons
     for polygon in polygons:
         n_points = len(polygon)
@@ -227,7 +229,7 @@ def find_arrows(image):
         sides = sorted(sides, key=lambda line: (line[2], line[0][0]), reverse=True)[:2]
 
         # Solve arrows and sort by x-axis
-        debug_print_lines(sides, processed_image, (100, 0, 0))
+        debug_print_lines(sides, processed_image, (255, 0, 0))
         arrow = solve_arrow_horizontal(sides)
         if arrow is not None:
             if DEBUG:
@@ -242,9 +244,9 @@ def find_arrows(image):
                     print(arrow)
                 arrows.append(arrow)
 
-    uuid_1 = uuid.uuid1()
-    cv2.imwrite(f"assets/training/{uuid_1}-raw.png", image)
-    cv2.imwrite(f"assets/training/{uuid_1}-processed.png", processed_image)
+    # uuid_1 = uuid.uuid1()
+    # cv2.imwrite(f"assets/training/{uuid_1}-raw.png", image)
+    # cv2.imwrite(f"assets/training/{uuid_1}-processed.png", processed_image)
 
     num_arrows = len(arrows)
     if num_arrows < 4:
@@ -291,7 +293,6 @@ def preprocess(image):
 def filter_contour(contour):
     return 300 <= cv2.contourArea(contour) <= 800
 
-
 def solve_arrow_horizontal(sides):
     if len(sides) != 2:
         return None
@@ -299,31 +300,12 @@ def solve_arrow_horizontal(sides):
     # sort by y-axis, if points are too close together then it's not horizontal
     points = get_points(sides)
     sorted_points = sorted(points, key=lambda point: point[1])
-    if len(sorted_points) != 4:
+
+    direction, x_coordinate = solve_arrow(sorted_points, True)
+    if direction == 0:
         return None
 
-
-    # Remove intersecting point
-    sorted_points = remove_intersecting_point(sorted_points)
-
-    # print("sorted y")
-    # print(sorted_points)
-    x1, y1 = sorted_points[0]
-    x2, y2 = sorted_points[1]
-    x3, y3 = sorted_points[2]
-    if (abs(y1 - y2) < POINT_THRESHOLD_NUM_PIXELS or
-        abs(y3 - y1) < POINT_THRESHOLD_NUM_PIXELS or
-        abs(y2 - y3) < POINT_THRESHOLD_NUM_PIXELS):
-        return None
-
-
-    if x2 < x1 and x2 < x3:
-        return 'left', x2
-    if x2 > x1 and x2 > x3:
-        return 'right', x2
-
-    return None
-
+    return ('left', x_coordinate) if direction == -1 else ('right', x_coordinate)
 
 def solve_arrow_vertical(sides):
     if len(sides) != 2:
@@ -332,28 +314,12 @@ def solve_arrow_vertical(sides):
     # sort by x-axis, if points are too close together then it's not vertical
     points = get_points(sides)
     sorted_points = sorted(points, key=lambda point: point[0])
-    if len(sorted_points) != 4:
+
+    direction, x_coordinate = solve_arrow(sorted_points, False)
+    if direction == 0:
         return None
 
-    # Remove intersecting point
-    sorted_points = remove_intersecting_point(sorted_points)
-
-    # print("sorted x")
-    # print(sorted_points)
-    x1, y1 = sorted_points[0]
-    x2, y2 = sorted_points[1]
-    x3, y3 = sorted_points[2]
-    if (abs(x1 - x2) < POINT_THRESHOLD_NUM_PIXELS or
-        abs(x3 - x1) < POINT_THRESHOLD_NUM_PIXELS or
-        abs(x2 - x3) < POINT_THRESHOLD_NUM_PIXELS):
-        return None
-
-    if y2 < y1 and y2 < y3:
-        return 'up', x2
-    if y2 > y1 and y2 > y3:
-        return 'down', x2
-
-    return None
+    return ('up', x_coordinate) if direction == -1 else ('down', x_coordinate)
 
 def get_points(sides):
     points = []
@@ -362,6 +328,37 @@ def get_points(sides):
         points.append((side[1][0], side[1][1]))
 
     return points
+
+def solve_arrow(sorted_points, is_horizontal):
+    # Remove intersecting point
+    sorted_points = remove_intersecting_point(sorted_points)
+    if len(sorted_points) != 3:
+        return 0, 0
+
+    x1, y1 = sorted_points[0]
+    x2, y2 = sorted_points[1]
+    x3, y3 = sorted_points[2]
+    if not is_horizontal:
+        direction = check_coordinates(x1, x2, x3, y1, y2, y3)
+    else:
+        direction = check_coordinates(y1, y2, y3, x1, x2, x3)
+
+    if direction == 0:
+        return direction, 0
+
+    angle = get_angle_between_points(
+        np.array([x1, y1]),
+        np.array([x3, y3]),
+        np.array([x2, y2])
+    )
+
+    if DEBUG:
+        print(f"angle {angle}")
+
+    if angle < ARROW_MIN_ANGLE or angle > ARROW_MAX_ANGLE:
+        return 0, 0
+
+    return direction, x2
 
 def remove_intersecting_point(points):
     if len(points) != 4:
@@ -374,6 +371,37 @@ def remove_intersecting_point(points):
         return points
     else:
         return points
+
+def check_coordinates(a1, a2, a3, b1, b2, b3):
+    # Check if points on axis too close
+    if (abs(a1 - a2) < POINT_THRESHOLD_NUM_PIXELS or
+        abs(a3 - a1) < POINT_THRESHOLD_NUM_PIXELS or
+        abs(a2 - a3) < POINT_THRESHOLD_NUM_PIXELS):
+        return 0
+
+    # Check if vertex is lower or higher than points
+    if b2 < b1 and b2 < b3:
+        return -1
+
+    if b2 > b1 and b2 > b3:
+        return 1
+
+    return 0
+
+def get_angle_between_points(p1, p2, vertex):
+    v1 = get_unit_vector(p1 - vertex)
+    v2 = get_unit_vector(p2 - vertex)
+    return get_angle(v1, v2)
+
+def get_unit_vector(v):
+    return v / np.linalg.norm(v)
+
+def get_angle(v1, v2):
+    return np.rad2deg(
+        np.arccos(np.clip(
+            np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)), -1, 1
+        ))
+    )
 
 def get_arrows(arrows):
     result = []
