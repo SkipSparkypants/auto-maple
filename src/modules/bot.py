@@ -4,16 +4,12 @@ import threading
 import time
 import git
 import cv2
-import inspect
-import importlib
 import traceback
-from os.path import splitext, basename
 from src.common import config, utils
-from src.routine import components
 from src.routine.routine import Routine
 from src.command_book.command_book import CommandBook
 from src.routine.components import Point
-from src.common.vkeys import press, click
+from src.common.vkeys import press
 from src.common.interfaces import Configurable
 import queue
 
