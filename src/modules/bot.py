@@ -11,6 +11,7 @@ from src.command_book.command_book import CommandBook
 from src.routine.components import Point
 from src.common.vkeys import press
 from src.common.interfaces import Configurable
+from src.detection import detection
 import queue
 
 from random import randint
@@ -96,6 +97,10 @@ class Bot(Configurable):
                     press(self.config['Feed Pet'], 1)
                     last_fed = now
 
+                # Settings
+                settings = config.gui.settings.bot_settings
+                self.use_tensorflow = settings.use_tensorflow.get()
+
                 # Highlight the current Point
                 config.gui.view.routine.select(config.routine.index)
                 config.gui.view.details.display_info(config.routine.index)
@@ -139,7 +144,9 @@ class Bot(Configurable):
             time.sleep(self.TIME_BETWEEN_FRAMES)
 
         now = time.time()
-        while time.time() - now < self.TIME_TO_SOLVE and config.frame_queue.unfinished_tasks:
+        while (time.time() - now < self.TIME_TO_SOLVE and
+               config.frame_queue.unfinished_tasks and
+               config.detection_result is not None):
             time.sleep(0.1)
 
         if config.detection_result is not None:

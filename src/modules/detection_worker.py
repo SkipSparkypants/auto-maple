@@ -36,9 +36,8 @@ class DetectionWorker:
             frame = config.frame_queue.get_nowait()
             if config.detection_result is None and config.bot.rune_active:
                 # print(f'Worker {self.id} getting inference'
-                detection_result = []
-                if config.model is not None:
-                    detection_result = detection.merge_detection(config.model, frame)
+                if config.bot.use_tensorflow:
+                    detection_result = detection.merge_detection(config.bot.model, frame)
                 else:
                     detection_result = detection.find_arrows(frame)
                 result_tuple = tuple(detection_result)
