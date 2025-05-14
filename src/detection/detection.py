@@ -11,7 +11,6 @@ ARROW_MIN_ANGLE = 70
 ARROW_MAX_ANGLE = 110
 
 DEBUG = False
-TF = False
 
 #########################
 #       Functions       #
@@ -21,8 +20,9 @@ def load_model():
     Loads the saved model's weights into an Tensorflow model.
     :return:    The Tensorflow model object.
     """
-    model_dir = f'assets/models/rune_model_rnn_filtered_cannied/saved_model'
-    return tf.saved_model.load(model_dir)
+    # model_dir = f'assets/models/rune_model_rnn_filtered_cannied/saved_model'
+    # return tf.saved_model.load(model_dir)
+    return None
 
 
 def canny(image):
@@ -47,9 +47,7 @@ def filter_color(image):
     """
 
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    mask_1 = cv2.inRange(hsv, (1, 75, 100), (85, 255, 255))
-    mask_2 = cv2.inRange(hsv, (95, 75, 100), (180, 255, 255))
-    mask = cv2.bitwise_or(mask_1, mask_2)
+    mask = cv2.inRange(hsv, (1, 75, 175), (180, 255, 255))
 
     # Mask the image
     color_mask = mask > 0
@@ -277,7 +275,8 @@ def preprocess(image):
         cropped = image
 
     hsv = cv2.cvtColor(filter_color(cropped), cv2.COLOR_RGB2HSV)
-    black_white = hsv[:, :, 0]
+    # black_white = hsv[:, :, 0]
+    black_white = hsv
     blurred = cv2.GaussianBlur(black_white, (5, 5), 1)
     blurred = cv2.medianBlur(blurred, 5)
     # cv2.imshow("processed", blurred)
@@ -389,12 +388,12 @@ def get_angle_between_points(p1, p2, vertex):
     return get_angle(v1, v2)
 
 def get_unit_vector(v):
-    return v / np.linalg.norm(v)
+    return np.clip(v / np.linalg.norm(v), -1, 1)
 
 def get_angle(v1, v2):
     return np.rad2deg(
         np.arccos(np.clip(
-            np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)), -1, 1
+            np.dot(v1, v2), -1, 1
         ))
     )
 
