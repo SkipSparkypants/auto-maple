@@ -5,6 +5,8 @@ import tensorflow as tf
 import numpy as np
 import uuid
 
+from src.common import utils
+
 POINT_THRESHOLD_NUM_PIXELS = 5
 INTERSECTION_THRESHOLD_NUM_PIXELS = 15
 ARROW_MIN_ANGLE = 70
