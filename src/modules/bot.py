@@ -158,11 +158,11 @@ class Bot(Configurable):
             config.solve_rune_attempt = 0
             send_to_webhook('solved rune')
         if config.solve_rune_attempt > 3:
-            config.auto_pot_enabled = True
+            config.auto_pot_enabled = False
             self.change_channel()
             config.solve_rune_attempt = 0
 
-        config.auto_pot_enabled = True
+        config.auto_pot_enabled = False
         config.detection_result = None
         #print(config.detection_inferences)
         config.detection_inferences.clear()

@@ -38,9 +38,9 @@ listener.start()
 while not listener.ready:
     time.sleep(0.01)
 
-auto_pot.start()
-while not auto_pot.ready:
-    time.sleep(0.01)
+# auto_pot.start()
+# while not auto_pot.ready:
+#     time.sleep(0.01)
 
 print('\n[~] Successfully initialized Auto Maple')
 
