@@ -118,7 +118,7 @@ def get_boxes(model, image):
     return boxes
 
 
-# @utils.run_if_enabled
+@utils.run_if_enabled
 def merge_detection(model, image):
     """
     Run two inferences: one on the upright image, and one on the image rotated 90 degrees.
@@ -189,7 +189,7 @@ def merge_detection(model, image):
             cv2.imwrite(f"assets/training/{uuid_1}-rotated.png", rotated)
     return classes
 
-# @utils.run_if_enabled
+@utils.run_if_enabled
 def find_arrows(image):
     processed_image = preprocess(image)
     contours, _ = cv2.findContours(processed_image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -323,6 +323,7 @@ def get_points(sides):
 
     return points
 
+# Get (direction, x-coordinate) tuple for arrows
 def solve_arrow(sorted_points, is_horizontal):
     # Remove intersecting point
     sorted_points = remove_intersecting_point(sorted_points)
@@ -354,6 +355,7 @@ def solve_arrow(sorted_points, is_horizontal):
 
     return direction, x2
 
+# Remove duplicate of vertex point
 def remove_intersecting_point(points):
     if len(points) != 4:
         return points
@@ -366,18 +368,20 @@ def remove_intersecting_point(points):
     else:
         return points
 
-def check_coordinates(a1, a2, a3, b1, b2, b3):
-    # Check if points on axis too close
-    if (abs(a1 - a2) < POINT_THRESHOLD_NUM_PIXELS or
-        abs(a3 - a1) < POINT_THRESHOLD_NUM_PIXELS or
-        abs(a2 - a3) < POINT_THRESHOLD_NUM_PIXELS):
+# Check coordinates along axis and perpendicular axis
+# assumes *2 is vertex point
+def check_coordinates(axis1, axis2, axis3, p_axis1, p_axis2, p_axis3):
+    # If points on axis too close then sides can't form an arrow
+    if (abs(axis1 - axis2) < POINT_THRESHOLD_NUM_PIXELS or
+        abs(axis3 - axis1) < POINT_THRESHOLD_NUM_PIXELS or
+        abs(axis2 - axis3) < POINT_THRESHOLD_NUM_PIXELS):
         return 0
 
-    # Check if vertex is lower or higher than points
-    if b2 < b1 and b2 < b3:
+    # Check if vertex is lower or higher than other points
+    if p_axis2 < p_axis1 and p_axis2 < p_axis3:
         return -1
 
-    if b2 > b1 and b2 > b3:
+    if p_axis2 > p_axis1 and p_axis2 > p_axis3:
         return 1
 
     return 0
