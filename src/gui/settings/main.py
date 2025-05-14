@@ -3,6 +3,7 @@
 import tkinter as tk
 from src.gui.interfaces import KeyBindings
 from src.gui.settings.pets import Pets
+from src.gui.settings.bot_settings import BotSettings
 from src.gui.interfaces import Tab, Frame
 from src.common import config
 
@@ -27,6 +28,9 @@ class Settings(Tab):
 
         self.pets = Pets(self.column1)
         self.pets.pack(side=tk.TOP, fill='x', expand=True, pady=(10, 0))
+
+        self.bot_settings = BotSettings(self.column1)
+        self.bot_settings.pack(side=tk.TOP, fill='x', expand=True, pady=(10, 0))
 
         self.column2 = Frame(self)
         self.column2.grid(row=0, column=2, sticky=tk.N, padx=10, pady=10)

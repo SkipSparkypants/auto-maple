@@ -1,5 +1,6 @@
 import threading
 import time
+import queue
 
 from src.common import config
 from src.detection import detection
@@ -31,17 +32,24 @@ class DetectionWorker:
 
     def classify_image(self):
         """Classifies image if result not found already."""
-        frame = config.frame_queue.get()
-        if config.detection_result is None and config.bot.rune_active:
-            print(f'Worker {self.id} getting inference')
-            detection_result = detection.merge_detection(config.model, frame)
-            result_tuple = tuple(detection_result)
+        try:
+            frame = config.frame_queue.get_nowait()
+            if config.detection_result is None and config.bot.rune_active:
+                # print(f'Worker {self.id} getting inference'
+                if config.bot.use_tensorflow:
+                    detection_result = detection.merge_detection(config.model, frame)
+                else:
+                    detection_result = detection.find_arrows(frame)
+                result_tuple = tuple(detection_result)
 
-            if result_tuple in config.detection_inferences or (config.bot.NUM_DETECTION_WORKERS <= 1 and len(detection_result) == 4):
-                print(f"Worker {self.id} got result {detection_result}")
-                config.detection_result = detection_result
-            elif len(detection_result) == 4:
-                print(f"Worker {self.id} got inference {detection_result}")
-                config.detection_inferences[result_tuple] = True
+                if result_tuple in config.detection_inferences or (
+                        config.bot.NUM_DETECTION_WORKERS <= 1 and len(detection_result) == 4):
+                    print(f"Worker {self.id} got result {detection_result}")
+                    config.detection_result = detection_result
+                elif len(detection_result) == 4:
+                    print(f"Worker {self.id} got inference {detection_result}")
+                    config.detection_inferences[result_tuple] = True
 
-        config.frame_queue.task_done()
+            config.frame_queue.task_done()
+        except queue.Empty:
+            time.sleep(0.1)

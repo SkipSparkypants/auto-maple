@@ -2,10 +2,17 @@
 
 import cv2
 import tensorflow as tf
-import time
 import numpy as np
 import uuid
+
 from src.common import utils
+
+POINT_THRESHOLD_NUM_PIXELS = 5
+INTERSECTION_THRESHOLD_NUM_PIXELS = 15
+ARROW_MIN_ANGLE = 70
+ARROW_MAX_ANGLE = 110
+
+DEBUG = False
 
 #########################
 #       Functions       #
@@ -15,10 +22,8 @@ def load_model():
     Loads the saved model's weights into an Tensorflow model.
     :return:    The Tensorflow model object.
     """
-
     model_dir = f'assets/models/rune_model_rnn_filtered_cannied/saved_model'
     return tf.saved_model.load(model_dir)
-
 
 def canny(image):
     """
@@ -36,12 +41,13 @@ def filter_color(image):
     """
     Filters out all colors not between orange and green on the HSV scale, which
     eliminates some noise around the arrows.
+    https://stackoverflow.com/questions/10948589/choosing-the-correct-upper-and-lower-hsv-boundaries-for-color-detection-withcv
     :param image:   The input image.
     :return:        The color-filtered image.
     """
 
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, (1, 100, 100), (75, 255, 255))
+    mask = cv2.inRange(hsv, (1, 75, 175), (180, 255, 255))
 
     # Mask the image
     color_mask = mask > 0
@@ -128,9 +134,13 @@ def merge_detection(model, image):
     
     # Preprocessing
     height, width, channels = image.shape
-    cropped = image[120:height//2, width//4:3*width//4]
+    cropped = image[23 * height // 100:40 * height // 100, 32 * width // 100:66 * width // 100]
     filtered = filter_color(cropped)
     cannied = canny(filtered)
+    uuid_1 = uuid.uuid1()
+    # cv2.imwrite(f"assets/training/{uuid_1}-raw.png", filtered)
+    # cv2.imwrite(f"assets/training/{uuid_1}-filtered.png", filtered)
+    # cv2.imwrite(f"assets/training/{uuid_1}-cannied.png", cannied)
 
     # Isolate the rune box
     height, width, channels = cannied.shape
@@ -174,11 +184,231 @@ def merge_detection(model, image):
             if rotated_classes and classes[i] in ['left', 'right']:
                 classes[i] = rotated_classes.pop(0)
 
-        # if len(classes) != 4:
-        #     uuid_1 = uuid.uuid1()
-        #     cv2.imwrite(f"assets/training/{uuid_1}.png", preprocessed)
-        #     cv2.imwrite(f"assets/training/{uuid_1}-rotated.png", rotated)
+        if len(classes) != 4:
+            cv2.imwrite(f"assets/training/{uuid_1}.png", preprocessed)
+            cv2.imwrite(f"assets/training/{uuid_1}-rotated.png", rotated)
     return classes
+
+@utils.run_if_enabled
+def find_arrows(image):
+    processed_image = preprocess(image)
+    contours, _ = cv2.findContours(processed_image, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours = filter(filter_contour, contours)
+
+    polygons = []
+    for contour in contours:
+        # lower arclength_filter number means tighter approximation
+        arclength_filter = 0.01 * cv2.arcLength(contour, True)
+        polygons.append(cv2.approxPolyDP(contour, arclength_filter,True))
+
+    if DEBUG:
+        cv2.drawContours(image, polygons, -1, (0, 255, 0), 3)
+        cv2.imshow("arrows", processed_image)
+
+    arrows = []
+    # Get polygons
+    for polygon in polygons:
+        n_points = len(polygon)
+        if n_points < 3:
+            continue
+        sides = []
+        for i, vertex in enumerate(polygon):
+            p1 = vertex[0]
+            p2 = polygon[(i + 1) % n_points][0]
+            d = np.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+            if 10 <= d <= 20:
+                sides.append((p1, p2, d))
+        # sort sides by length
+        sides = sorted(sides, key=lambda line: (line[2], line[0][0]), reverse=True)[:2]
+
+        # Solve arrows and sort by x-axis
+        debug_print_lines(sides, processed_image, (255, 0, 0))
+        arrow = solve_arrow_horizontal(sides)
+        if arrow is not None:
+            if DEBUG:
+                debug_print_lines(sides, processed_image, (50, 50, 0))
+                print(arrow)
+            arrows.append(arrow)
+        else:
+            arrow = solve_arrow_vertical(sides)
+            if arrow is not None:
+                if DEBUG:
+                    debug_print_lines(sides, processed_image, (50, 50, 0))
+                    print(arrow)
+                arrows.append(arrow)
+
+    # uuid_1 = uuid.uuid1()
+    # cv2.imwrite(f"assets/training/{uuid_1}-raw.png", image)
+    # cv2.imwrite(f"assets/training/{uuid_1}-processed.png", processed_image)
+
+    num_arrows = len(arrows)
+    if num_arrows < 4:
+        return []
+
+    sorted_arrows = sorted(arrows, key=lambda arrow: arrow[1])
+    results = [sorted_arrows[0]]
+    for i in range(1, num_arrows):
+        if abs(sorted_arrows[i][1] - sorted_arrows[i - 1][1]) >= POINT_THRESHOLD_NUM_PIXELS:
+            results.append(sorted_arrows[i])
+        if len(results) == 4:
+            return get_arrows(results)
+
+    # cv2.imshow("arrows", image)
+    # cv2.waitKey(3000)
+    return get_arrows(results)
+
+def debug_print_lines(sides, image, color):
+    if DEBUG:
+        count = 0
+        for side in sides:
+            cv2.line(image, side[0], side[1], color, 2)
+            cv2.imshow("arrows", image)
+            cv2.waitKey(3000)
+            count += 1
+            if count > 1:
+                break
+
+def preprocess(image):
+    height, width, channels = image.shape
+    cropped = image[23 * height // 100:40 * height // 100, 32 * width // 100:66 * width // 100]
+    if DEBUG:
+        cropped = image
+
+    hsv = cv2.cvtColor(filter_color(cropped), cv2.COLOR_RGB2HSV)
+    # black_white = hsv[:, :, 0]
+    black_white = hsv
+    blurred = cv2.GaussianBlur(black_white, (5, 5), 1)
+    blurred = cv2.medianBlur(blurred, 5)
+    # cv2.imshow("processed", blurred)
+    cannied = cv2.Canny(blurred, 50, 50)
+
+    return cannied
+
+def filter_contour(contour):
+    return 300 <= cv2.contourArea(contour) <= 800
+
+def solve_arrow_horizontal(sides):
+    if len(sides) != 2:
+        return None
+
+    # sort by y-axis, if points are too close together then it's not horizontal
+    points = get_points(sides)
+    sorted_points = sorted(points, key=lambda point: point[1])
+
+    direction, x_coordinate = solve_arrow(sorted_points, True)
+    if direction == 0:
+        return None
+
+    return ('left', x_coordinate) if direction == -1 else ('right', x_coordinate)
+
+def solve_arrow_vertical(sides):
+    if len(sides) != 2:
+        return None
+
+    # sort by x-axis, if points are too close together then it's not vertical
+    points = get_points(sides)
+    sorted_points = sorted(points, key=lambda point: point[0])
+
+    direction, x_coordinate = solve_arrow(sorted_points, False)
+    if direction == 0:
+        return None
+
+    return ('up', x_coordinate) if direction == -1 else ('down', x_coordinate)
+
+def get_points(sides):
+    points = []
+    for side in sides:
+        points.append((side[0][0], side[0][1]))
+        points.append((side[1][0], side[1][1]))
+
+    return points
+
+# Get (direction, x-coordinate) tuple for arrows
+def solve_arrow(sorted_points, is_horizontal):
+    # Remove intersecting point
+    sorted_points = remove_intersecting_point(sorted_points)
+    if len(sorted_points) != 3:
+        return 0, 0
+
+    x1, y1 = sorted_points[0]
+    x2, y2 = sorted_points[1]
+    x3, y3 = sorted_points[2]
+    if not is_horizontal:
+        direction = check_coordinates(x1, x2, x3, y1, y2, y3)
+    else:
+        direction = check_coordinates(y1, y2, y3, x1, x2, x3)
+
+    if direction == 0:
+        return direction, 0
+
+    angle = get_angle_between_points(
+        np.array([x1, y1]),
+        np.array([x3, y3]),
+        np.array([x2, y2])
+    )
+
+    if DEBUG:
+        print(f"angle {angle}")
+
+    if angle < ARROW_MIN_ANGLE or angle > ARROW_MAX_ANGLE:
+        return 0, 0
+
+    return direction, x2
+
+# Remove duplicate of vertex point
+def remove_intersecting_point(points):
+    if len(points) != 4:
+        return points
+
+    # Remove intersecting point
+    if (abs(points[1][0] - points[2][0]) < INTERSECTION_THRESHOLD_NUM_PIXELS and
+        abs(points[1][1] - points[2][1]) < INTERSECTION_THRESHOLD_NUM_PIXELS):
+        points.pop(1)
+        return points
+    else:
+        return points
+
+# Check coordinates along axis and perpendicular axis
+# assumes *2 is vertex point
+def check_coordinates(axis1, axis2, axis3, p_axis1, p_axis2, p_axis3):
+    # If points on axis too close then sides can't form an arrow
+    if (abs(axis1 - axis2) < POINT_THRESHOLD_NUM_PIXELS or
+        abs(axis3 - axis1) < POINT_THRESHOLD_NUM_PIXELS or
+        abs(axis2 - axis3) < POINT_THRESHOLD_NUM_PIXELS):
+        return 0
+
+    # Check if vertex is lower or higher than other points
+    if p_axis2 < p_axis1 and p_axis2 < p_axis3:
+        return -1
+
+    if p_axis2 > p_axis1 and p_axis2 > p_axis3:
+        return 1
+
+    return 0
+
+def get_angle_between_points(p1, p2, vertex):
+    v1 = get_unit_vector(p1 - vertex)
+    v2 = get_unit_vector(p2 - vertex)
+    return get_angle(v1, v2)
+
+def get_unit_vector(v):
+    return np.clip(v / np.linalg.norm(v), -1, 1)
+
+def get_angle(v1, v2):
+    return np.rad2deg(
+        np.arccos(np.clip(
+            np.dot(v1, v2), -1, 1
+        ))
+    )
+
+def get_arrows(arrows):
+    result = []
+    if len(arrows) != 4:
+        return result
+
+    for arrow in arrows:
+        result.append(arrow[0])
+    return result
 
 # Script for testing the detection module by itself
 if __name__ == '__main__':
@@ -186,12 +416,13 @@ if __name__ == '__main__':
     import mss
     config.enabled = True
     monitor = {'top': 0, 'left': 0, 'width': 1366, 'height': 768}
-    model = load_model()
+    # model = load_model()
     while True:
         with mss.mss() as sct:
             frame = np.array(sct.grab(monitor))
-            cv2.imshow('frame', canny(filter_color(frame)))
-            arrows = merge_detection(model, frame)
+            #cv2.imshow('frame', canny(filter_color(frame)))
+            # arrows = merge_detection(model, frame)
+            arrows = find_arrows(frame)
             print(arrows)
-            if cv2.waitKey(1) & 0xFF == 27:     # 27 is ASCII for the Esc key
+            if cv2.waitKey(10000) & 0xFF == 27:     # 27 is ASCII for the Esc key
                 break
