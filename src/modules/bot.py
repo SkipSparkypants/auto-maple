@@ -4,17 +4,14 @@ import threading
 import time
 import git
 import cv2
-import inspect
-import importlib
 import traceback
-from os.path import splitext, basename
 from src.common import config, utils
-from src.routine import components
 from src.routine.routine import Routine
 from src.command_book.command_book import CommandBook
 from src.routine.components import Point
-from src.common.vkeys import press, click
+from src.common.vkeys import press
 from src.common.interfaces import Configurable
+from src.detection import detection
 import queue
 
 from random import randint
@@ -41,7 +38,7 @@ class Bot(Configurable):
 
         self.NUM_DETECTION_WORKERS = 2
         self.NUM_FRAMES_TO_PROCESS = self.NUM_DETECTION_WORKERS * 10
-        self.TIME_BETWEEN_FRAMES = 0.15
+        self.TIME_BETWEEN_FRAMES = 0.2
         self.TIME_TO_SOLVE = 10
 
         self.cc_flag = False
@@ -100,6 +97,10 @@ class Bot(Configurable):
                     press(self.config['Feed Pet'], 1)
                     last_fed = now
 
+                # Settings
+                settings = config.gui.settings.bot_settings
+                self.use_tensorflow = settings.use_tensorflow.get()
+
                 # Highlight the current Point
                 config.gui.view.routine.select(config.routine.index)
                 config.gui.view.details.display_info(config.routine.index)
@@ -132,7 +133,7 @@ class Bot(Configurable):
         print('\nSolving rune:')
         config.detection_result = None
         press(self.config['Interact'], 1, down_time=0.2)  # Inherited from Configurable
-        time.sleep(1.5)
+        time.sleep(1.0)
 
         for _ in range(self.NUM_FRAMES_TO_PROCESS):
             try:
@@ -143,7 +144,9 @@ class Bot(Configurable):
             time.sleep(self.TIME_BETWEEN_FRAMES)
 
         now = time.time()
-        while time.time() - now < self.TIME_TO_SOLVE and config.frame_queue.unfinished_tasks:
+        while (time.time() - now < self.TIME_TO_SOLVE and
+               config.frame_queue.unfinished_tasks and
+               config.detection_result is not None):
             time.sleep(0.1)
 
         if config.detection_result is not None:

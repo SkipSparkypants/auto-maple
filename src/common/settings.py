@@ -78,7 +78,7 @@ def reset():
     """Resets all settings to their default values."""
 
     global move_tolerance, adjust_tolerance, record_layout, buff_cooldown
-    move_tolerance = 0.1
+    move_tolerance = 0.09
     adjust_tolerance = 0.01
     record_layout = False
     buff_cooldown = 180
