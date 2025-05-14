@@ -22,10 +22,8 @@ def load_model():
     Loads the saved model's weights into an Tensorflow model.
     :return:    The Tensorflow model object.
     """
-    # model_dir = f'assets/models/rune_model_rnn_filtered_cannied/saved_model'
-    # return tf.saved_model.load(model_dir)
-    return None
-
+    model_dir = f'assets/models/rune_model_rnn_filtered_cannied/saved_model'
+    return tf.saved_model.load(model_dir)
 
 def canny(image):
     """
