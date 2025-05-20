@@ -99,7 +99,7 @@ class Notifier:
                 filtered = utils.filter_color(minimap, OTHER_RANGES)
                 others = len(utils.multi_match(filtered, OTHER_TEMPLATE, threshold=0.5))
                 config.stage_fright = others > 0
-                if others != prev_others:
+                if others != prev_others and others > 1:
                     now = time.time()
                     if others > prev_others and now - config.bot.time_in_map < self.CC_THRESHOLD:
                         self._ping('ding')
